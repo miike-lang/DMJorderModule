@@ -6,7 +6,6 @@ datasource db {
   provider = "postgresql"
   url      = "postgresql://postgres:fDxMcwpNpIIpVPqfjQwqwqxKhblxPYNo@shuttle.proxy.rlwy.net:48338/railway"
 }
-}
 
 model Product {
   id                String              @id
