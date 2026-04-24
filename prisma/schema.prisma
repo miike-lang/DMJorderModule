@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id                String              @id
+  sku               String
+  brand             String
+  name              String
+  description       String?
+  price             Float
+  ean               String?
+  weight            String?
+  imageUrl          String?
+  images            String[]
+  usps              String[]
+  createdAt         DateTime            @default(now())
+  CollectionProduct CollectionProduct[]
+}
+
+model Collection {
+  id          Int                 @id @default(autoincrement())
+  name        String
+  description String?
+  products    CollectionProduct[]
+  clients     ClientCollection[]
+  createdAt   DateTime            @default(now())
+}
+
+model CollectionProduct {
+  collection   Collection @relation(fields: [collectionId], references: [id])
+  collectionId Int
+  product      Product    @relation(fields: [productId], references: [id])
+  productId    String
+
+  @@id([collectionId, productId])
+}
+
+model Client {
+  id          Int                @id @default(autoincrement())
+  name        String
+  email       String             @unique
+  token       String             @unique
+  note        String?
+  collections ClientCollection[]
+  orders      Order[]
+  createdAt   DateTime           @default(now())
+}
+
+model ClientCollection {
+  client       Client     @relation(fields: [clientId], references: [id])
+  clientId     Int
+  collection   Collection @relation(fields: [collectionId], references: [id])
+  collectionId Int
+
+  @@id([clientId, collectionId])
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  orderNr   String      @unique
+  client    Client      @relation(fields: [clientId], references: [id])
+  clientId  Int
+  items     OrderItem[]
+  total     Float
+  note      String?
+  status    String      @default("Nieuw")
+  createdAt DateTime    @default(now())
+}
+
+model OrderItem {
+  id        Int    @id @default(autoincrement())
+  order     Order  @relation(fields: [orderId], references: [id])
+  orderId   Int
+  productId String
+  sku       String
+  name      String
+  price     Float
+  qty       Int
+}
