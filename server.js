@@ -7,7 +7,13 @@ import { Resend } from "resend";
 import crypto from "crypto";
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || "postgresql://postgres:fDxMcwpNpIIpVPqfjQwqwqxKhblxPYNo@shuttle.proxy.rlwy.net:48338/railway"
+    }
+  }
+});
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
