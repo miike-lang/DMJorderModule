@@ -7,18 +7,18 @@ import crypto from "crypto";
 
 const app = express();
 const prisma = new PrismaClient();
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 app.use(cors());
 app.use(express.json());
 
-// ─── PRODUCTEN ───────────────────────────────────────────────
 app.get("/api/products", async (req, res) => {
   const products = await prisma.product.findMany();
   res.json(products);
 });
 
-// ─── COLLECTIES ──────────────────────────────────────────────
 app.get("/api/collections", async (req, res) => {
   const collections = await prisma.collection.findMany({
     include: { products: { include: { product: true } } }
@@ -26,7 +26,6 @@ app.get("/api/collections", async (req, res) => {
   res.json(collections);
 });
 
-// ─── KLANT VIA TOKEN (magic link) ────────────────────────────
 app.get("/api/client/:token", async (req, res) => {
   const client = await prisma.client.findUnique({
     where: { token: req.params.token },
@@ -44,10 +43,8 @@ app.get("/api/client/:token", async (req, res) => {
   res.json(client);
 });
 
-// ─── BESTELLING PLAATSEN ──────────────────────────────────────
 app.post("/api/orders", async (req, res) => {
   const { token, items, note } = req.body;
-
   const client = await prisma.client.findUnique({ where: { token } });
   if (!client) return res.status(404).json({ error: "Klant niet gevonden" });
 
@@ -78,26 +75,25 @@ app.post("/api/orders", async (req, res) => {
     .map(i => `• ${i.name} (${i.sku}) — ${i.qty}× — €${(i.price * i.qty).toFixed(2)}`)
     .join("\n");
 
-  // Mail naar admin
-  await resend.emails.send({
-    from: "DMJ Showroom <noreply@dmjoutdoor.nl>",
-    to: [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAIL2],
-    subject: `Nieuwe bestelling ${orderNr} — ${client.name}`,
-    text: `Nieuwe bestelling ontvangen.\n\nOrdernummer: ${orderNr}\nKlant: ${client.name}\nE-mail: ${client.email}\n\nProducten:\n${itemLines}\n\nTotaal: €${total.toFixed(2)}\n${note ? `\nOpmerking: ${note}` : ""}`
-  });
+  if (resend) {
+    await resend.emails.send({
+      from: "DMJ Showroom <noreply@dmjoutdoor.nl>",
+      to: [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAIL2],
+      subject: `Nieuwe bestelling ${orderNr} — ${client.name}`,
+      text: `Nieuwe bestelling ontvangen.\n\nOrdernummer: ${orderNr}\nKlant: ${client.name}\nE-mail: ${client.email}\n\nProducten:\n${itemLines}\n\nTotaal: €${total.toFixed(2)}\n${note ? `\nOpmerking: ${note}` : ""}`
+    });
 
-  // Bevestiging naar klant
-  await resend.emails.send({
-    from: "DMJ Outdoor <noreply@dmjoutdoor.nl>",
-    to: client.email,
-    subject: `Bevestiging bestelling ${orderNr}`,
-    text: `Beste ${client.name.split(" ")[0]},\n\nBedankt voor uw bestelling!\n\nOrdernummer: ${orderNr}\n\nProducten:\n${itemLines}\n\nTotaal: €${total.toFixed(2)}\n\nWij nemen zo spoedig mogelijk contact op.\n\nMet vriendelijke groet,\nMike — DMJ Outdoor BV`
-  });
+    await resend.emails.send({
+      from: "DMJ Outdoor <noreply@dmjoutdoor.nl>",
+      to: client.email,
+      subject: `Bevestiging bestelling ${orderNr}`,
+      text: `Beste ${client.name.split(" ")[0]},\n\nBedankt voor uw bestelling!\n\nOrdernummer: ${orderNr}\n\nProducten:\n${itemLines}\n\nTotaal: €${total.toFixed(2)}\n\nWij nemen zo spoedig mogelijk contact op.\n\nMet vriendelijke groet,\nMike — DMJ Outdoor BV`
+    });
+  }
 
   res.json({ success: true, orderNr });
 });
 
-// ─── BESTELLINGEN (admin) ─────────────────────────────────────
 app.get("/api/orders", async (req, res) => {
   const orders = await prisma.order.findMany({
     include: { client: true, items: true },
@@ -114,7 +110,6 @@ app.patch("/api/orders/:id", async (req, res) => {
   res.json(order);
 });
 
-// ─── KLANTEN (admin) ──────────────────────────────────────────
 app.get("/api/clients", async (req, res) => {
   const clients = await prisma.client.findMany({
     include: { collections: true, orders: true }
